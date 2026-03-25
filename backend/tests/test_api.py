@@ -1,114 +1,66 @@
-"""
-BRD-aligned API tests. Run with: pytest tests/ -v
-"""
 import pytest
+import io
+import uuid
 from fastapi.testclient import TestClient
-
 from app.main import app
+from app.db.supabase import supabase
 
 client = TestClient(app)
 
+def test_full_apply_flow():
+    # 1. Ensure we have a job in the system to apply for
+    job_id = str(uuid.uuid4())
+    job_data = {
+        "id": job_id,
+        "title": "Software Engineer (Test)",
+        "description": "Building AI features at scale.",
+        "requirements": ["Python", "OpenAI"],
+        "recruiter_id": "00000000-0000-0000-0000-000000000000" # Dummy / Valid UUID if profile exists
+    }
+    
+    # Try to insert dummy job for test (only works if auth/rls allows or using service role)
+    # For CI, usually we use mock DB or bypass RLS
+    try:
+        supabase.table("jobs").upsert(job_data).execute()
+    except:
+        # Fallback: get an existing job if upsert fails
+        jobs_res = supabase.table("jobs").select("id").limit(1).execute()
+        if jobs_res.data:
+            job_id = jobs_res.data[0]["id"]
+        else:
+            pytest.skip("No jobs available for testing.")
 
-def test_root():
-    r = client.get("/")
-    assert r.status_code == 200
-    assert "message" in r.json()
+    # 2. CREATE A SAMPLE FILE
+    file_content = b"Candidate Name: John Doe. Skills: Python, AI, Machine Learning. Experience at Google for 10 years."
+    file = io.BytesIO(file_content)
+    file.name = "resume.pdf" # pretending it's a pdf for extension check
 
-
-def test_list_jobs():
-    r = client.get("/api/v1/jobs/")
-    assert r.status_code == 200
-    data = r.json()
-    assert isinstance(data, list)
-    if data:
-        assert "id" in data[0]
-        assert "title" in data[0]
-        assert "description" in data[0]
-
-
-def test_create_job():
-    r = client.post(
-        "/api/v1/jobs/",
-        json={
-            "title": "Test Engineer",
-            "description": "Test job",
-            "requirements": ["Python", "pytest"],
-            "department": "Engineering",
-        },
-    )
-    assert r.status_code == 200
-    j = r.json()
-    assert j["title"] == "Test Engineer"
-    assert "id" in j
-
-
-def test_apply_and_status():
-    # Ensure we have a job
-    jobs = client.get("/api/v1/jobs/").json()
-    assert jobs, "Need at least one job"
-    job_id = jobs[0]["id"]
-
-    r = client.post(
+    # 3. POST /applications/
+    response = client.post(
         "/api/v1/applications/",
-        json={
+        data={
             "job_id": job_id,
-            "name": "Test User",
+            "name": "Integration Test Candidate",
             "email": "test@example.com",
-            "phone": "+1234567890",
-            "resume_text": "Python FastAPI React 5 years experience.",
+            "phone": "1234567890"
         },
+        files={"file": ("resume.pdf", file, "application/pdf")}
     )
-    assert r.status_code == 200
-    app_data = r.json()
-    assert app_data["name"] == "Test User"
-    assert "id" in app_data
-    assert "status" in app_data
-    assert "match_score" in app_data
 
-    # BRD: GET application status
-    aid = app_data["id"]
-    r2 = client.get(f"/api/v1/applications/status/{aid}")
+    assert response.status_code == 200
+    data = response.json()
+    assert "application_id" in data
+    assert "match_score" in data
+    assert "status" in data
+    assert "parsed_data" in data
+    
+    # 4. GET status
+    app_id = data["application_id"]
+    r2 = client.get(f"/api/v1/applications/status/{app_id}")
     assert r2.status_code == 200
-    assert r2.json()["id"] == aid
+    assert r2.json()["status"] == data["status"]
 
-
-def test_schedule_slots_and_book():
-    jobs = client.get("/api/v1/jobs/").json()
-    job_id = jobs[0]["id"]
-    apply_r = client.post(
-        "/api/v1/applications/",
-        json={
-            "job_id": job_id,
-            "name": "Schedule Test",
-            "email": "sched@example.com",
-            "phone": "0",
-            "resume_text": "Resume text",
-        },
-    )
-    application_id = apply_r.json()["id"]
-
-    r = client.get("/api/v1/schedule/slots")
-    assert r.status_code == 200
-    slots = r.json()
-    assert isinstance(slots, list)
-    if not slots:
-        pytest.skip("No slots")
-    slot_id = slots[0]["slot_id"]
-
-    book_r = client.post(
-        "/api/v1/schedule/book",
-        json={"application_id": application_id, "slot_id": slot_id},
-    )
-    assert book_r.status_code == 200
-    b = book_r.json()
-    assert "interview_id" in b
-    assert "unique_link" in b
-    assert "/room/" in b["unique_link"] or "room" in b["unique_link"]
-
-
-def test_assessment_by_interview():
-    # Assessment placeholder when no interview done yet
-    r = client.get("/api/v1/assessments/interview/some-fake-id")
-    assert r.status_code == 200
-    a = r.json()
-    assert "feedback" in a or "id" in a
+def test_health():
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"

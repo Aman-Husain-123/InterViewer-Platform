@@ -12,6 +12,10 @@ class JobCreate(JobBase):
 
 class JobResponse(JobBase):
     id: str
+    recruiter_id: str
+    is_active: bool = True
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
 class ApplicationBase(BaseModel):
     job_id: str

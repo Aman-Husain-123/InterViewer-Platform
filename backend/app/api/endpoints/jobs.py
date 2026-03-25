@@ -1,61 +1,71 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from app.schemas.schemas import JobCreate, JobResponse
 from typing import List
 from app.db.supabase import supabase
-from app.core.config import settings
+from app.api.v1.endpoints.auth import get_current_user
+from app.core.deps import CurrentUser
 import uuid
 
 router = APIRouter()
 
-# Mock data for skeleton when real Supabase is not configured
-MOCK_JOBS = [
-    {
-        "id": "1",
-        "title": "Senior Software Engineer",
-        "description": "Looking for a python dev",
-        "requirements": ["Python", "FastAPI"],
-        "department": "Engineering"
-    }
-]
-
-def is_supabase_configured():
-    return settings.SUPABASE_URL != "http://localhost:8000" and settings.SUPABASE_KEY != "dummy_key"
-
 @router.post("/", response_model=JobResponse)
-def create_job(job: JobCreate):
-    if not is_supabase_configured():
-        # Fallback to mock data
-        new_job = job.model_dump()
-        new_job["id"] = str(uuid.uuid4())
-        MOCK_JOBS.append(new_job)
-        return new_job
-        
+def create_job(job: JobCreate, current_user: CurrentUser = Depends(get_current_user)):
+    """
+    Creates a new job listing.
+    """
     try:
-        response = supabase.table("jobs").insert(job.model_dump()).execute()
+        # 1. ATTEMPT TO SYNC PROFILE (CRITICAL: We now raise the error if it fails)
+        try:
+            profile_data = {
+                "id": current_user.id,
+                "email": current_user.email,
+                "role": "recruiter"
+            }
+            # This must succeed for the next step to work
+            supabase.table("profiles").upsert(profile_data, on_conflict="id").execute()
+            print(f"Auto-synced profile for {current_user.email}")
+        except Exception as profile_err:
+            print(f"Profile Sync Fatal Error: {profile_err}")
+            # We raise this because if we can't create the profile, the job WILL NOT save.
+            # This error will show us if the 'profiles' table is missing.
+            raise HTTPException(
+                status_code=500, 
+                detail=f"CRITICAL: Failed to initialize recruiter profile. Reason: {str(profile_err)}"
+            )
+
+        # 2. Check if user is recruiter
+        if current_user.role != "recruiter":
+            raise HTTPException(status_code=403, detail="Only recruiters can create jobs")
+
+        # 3. Insert Job Data
+        job_data = job.model_dump()
+        job_data["recruiter_id"] = current_user.id
+        
+        response = supabase.table("jobs").insert(job_data).execute()
+        
         if response.data:
             return response.data[0]
-        raise HTTPException(status_code=400, detail="Failed to create job")
+        
+        raise HTTPException(status_code=400, detail="Failed to create job - database returned no data.")
+        
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"Job Creation Fatal Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.get("/", response_model=List[JobResponse])
 def list_jobs():
-    if not is_supabase_configured():
-        return MOCK_JOBS
+    """Returns all active jobs."""
     try:
-        response = supabase.table("jobs").select("*").execute()
-        return response.data
+        response = supabase.table("jobs").select("*").eq("is_active", True).execute()
+        return response.data or []
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-
 @router.get("/{job_id}", response_model=JobResponse)
 def get_job(job_id: str):
-    if not is_supabase_configured():
-        job = next((j for j in MOCK_JOBS if j["id"] == job_id), None)
-        if not job:
-            raise HTTPException(status_code=404, detail="Job not found")
-        return job
+    """Returns details for a single job."""
     try:
         response = supabase.table("jobs").select("*").eq("id", job_id).execute()
         if not response.data:

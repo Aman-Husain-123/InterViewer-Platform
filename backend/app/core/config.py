@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     # Supabase
     SUPABASE_URL: str = "http://localhost:54321"
     SUPABASE_KEY: str = "your-anon-key-here"
+    SUPABASE_SERVICE_ROLE_KEY: str = "your-service-role-key-here"
     SUPABASE_JWT_SECRET: str = "your-jwt-secret-here"
 
     # OpenAI
@@ -29,6 +30,9 @@ class Settings(BaseSettings):
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
+    
+    # Matching
+    MATCH_THRESHOLD: float = 75.0
 
     # CORS
     ALLOWED_ORIGINS: list[str] = [

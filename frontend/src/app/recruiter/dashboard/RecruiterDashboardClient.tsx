@@ -14,12 +14,14 @@ type Job = Database["public"]["Tables"]["jobs"]["Row"] & {
 interface RecruiterDashboardClientProps {
     profile: Profile | null;
     jobs: Job[];
+    interviewsCompleted: number;
     userEmail: string;
 }
 
 export function RecruiterDashboardClient({
     profile,
     jobs,
+    interviewsCompleted,
     userEmail,
 }: RecruiterDashboardClientProps) {
     const { signOut } = useUser();
@@ -87,7 +89,7 @@ export function RecruiterDashboardClient({
                         {[
                             { label: "Active Jobs", value: jobs.length, icon: Briefcase, color: "bg-blue-500/10 text-blue-400" },
                             { label: "Total Candidates", value: jobs.reduce((acc, j) => acc + j.applicantCount, 0), icon: Users, color: "bg-emerald-500/10 text-emerald-400" },
-                            { label: "Interviews Complete", value: 12, icon: LayoutDashboard, color: "bg-purple-500/10 text-purple-400" }
+                            { label: "Interviews Complete", value: interviewsCompleted, icon: LayoutDashboard, color: "bg-purple-500/10 text-purple-400" }
                         ].map((stat, i) => (
                             <div key={i} className="bg-slate-900/40 border border-white/5 rounded-3xl p-6 hover:bg-slate-900/60 transition-all border-b-4 border-b-indigo-500/20">
                                 <div className={`w-12 h-12 rounded-2xl ${stat.color} flex items-center justify-center mb-4`}>
