@@ -1,8 +1,11 @@
+"use client";
+
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { CandidateNav } from "@/components/candidate/CandidateNav";
 import { Button } from "@/components/ui/button";
 import { Calendar, Video, Clock, CheckCircle } from "lucide-react";
 
-export default function CandidateDashboard() {
+function CandidateDashboardContent() {
   return (
     <div className="flex min-h-screen">
       <CandidateNav />
@@ -80,11 +83,18 @@ export default function CandidateDashboard() {
               </div>
               <div className="p-6 pt-0">
                 <Button variant="outline" className="w-full">View Offer Details</Button>
-              </div>
-            </div>
+              </div>            </div>
           </div>
         </div>
       </main>
     </div>
+  );
+}
+
+export default function CandidateDashboard() {
+  return (
+    <ProtectedRoute requiredRole="candidate">
+      <CandidateDashboardContent />
+    </ProtectedRoute>
   );
 }

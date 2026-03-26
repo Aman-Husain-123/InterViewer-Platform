@@ -51,16 +51,23 @@ export default function RegisterPage() {
             setError(signUpError.message);
             setLoading(false);
             return;
-        }
-
-        // 2. Sync to separate tables based on role
+        }        // 2. Create profile with role in profiles table
         if (data.user) {
+            // Create profiles entry with role
+            await supabase.from("profiles").upsert({
+                id: data.user.id,
+                email,
+                full_name: fullName,
+                role,
+            } as any, { onConflict: 'id' });
+
+            // Also sync to separate tables based on role
             const table = role === "recruiter" ? "recruiters" : "candidates";
             await supabase.from(table).upsert({
                 id: data.user.id,
                 email,
                 full_name: fullName,
-            }, { on_conflict: 'id' });
+            } as any, { onConflict: 'id' });
         }
 
         setSuccess(true);

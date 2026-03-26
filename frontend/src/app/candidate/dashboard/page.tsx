@@ -184,6 +184,35 @@ export default function CandidateDashboard() {
                 <p className="text-slate-400 text-lg font-medium">Your application summary and upcoming action items.</p>
               </header>
 
+              {/* NEW! HIGH-PRIORITY INTEGRATED SCHEDULING BANNER */}
+              {invites.length > 0 && (
+                  <div className="bg-indigo-600 rounded-[40px] p-8 mb-12 shadow-2xl shadow-indigo-600/30 relative overflow-hidden group">
+                    <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="flex items-center gap-6">
+                            <div className="w-16 h-16 bg-white/10 rounded-3xl flex items-center justify-center backdrop-blur-md">
+                                <Mail className="w-8 h-8 text-white animate-bounce" />
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-black text-white uppercase tracking-tight italic">You've been invited!</h2>
+                                <p className="text-indigo-100 font-bold uppercase text-[10px] tracking-[0.2em] mt-1">Recruiters are waiting for your availability</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <div className="text-right hidden md:block">
+                                <p className="text-white/60 text-[10px] font-black uppercase tracking-widest">Active Invite</p>
+                                <p className="text-white font-bold">{invites[0].jobs?.title}</p>
+                            </div>
+                            <Button 
+                                onClick={() => setActiveTab("notifications")}
+                                className="bg-white text-indigo-600 hover:bg-slate-100 rounded-2xl py-6 px-8 font-black uppercase tracking-widest text-xs shadow-xl"
+                            >
+                                Schedule Now
+                            </Button>
+                        </div>
+                    </div>
+                  </div>
+              )}
+
               <div className="grid md:grid-cols-3 gap-6">
                 <Card className="bg-slate-900/40 border-white/5 p-8 rounded-[36px] flex flex-col items-center justify-center text-center">
                     <p className="text-[10px] font-black text-indigo-400 mb-2 uppercase tracking-widest">Invitations</p>

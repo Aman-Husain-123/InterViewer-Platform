@@ -106,37 +106,37 @@ export function RecruiterDashboardClient({
                     </div>
 
                     <div className="grid lg:grid-cols-2 gap-12 mb-12">
-                        {/* UPCOMING SESSIONS */}
+                        {/* 1. UPCOMING SESSIONS (REPLIED) */}
                         <div>
                             <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-wider flex items-center gap-3">
-                                <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                                UPCOMING INTERVIEWS ({upcomingSessions.length})
+                                <Video className="w-6 h-6 text-emerald-400" />
+                                Candidates Replied ({upcomingSessions.length})
                             </h2>
                             <div className="space-y-4">
                                 {upcomingSessions.length === 0 ? (
                                     <div className="bg-slate-900/40 border border-white/5 rounded-[32px] p-10 text-center">
-                                        <p className="text-slate-500 text-sm italic">No confirmed bookings yet.</p>
+                                        <p className="text-slate-500 text-sm italic">Waiting for candidates to pick slots...</p>
                                     </div>
                                 ) : (
                                     upcomingSessions.map((session) => (
-                                        <div key={session.id} className="bg-slate-900/40 border border-white/5 p-6 rounded-[32px] hover:bg-slate-900/60 transition-all border-l-4 border-l-indigo-600 group">
+                                        <div key={session.id} className="bg-slate-900/40 border border-emerald-500/10 p-6 rounded-[32px] hover:bg-slate-900/60 transition-all border-l-4 border-l-emerald-600 group">
                                             <div className="flex items-center justify-between">
                                                 <div className="space-y-1">
-                                                    <div className="flex items-center gap-2 text-indigo-400">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                                                    <div className="flex items-center gap-2 text-emerald-400">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                                         <span className="text-[10px] font-black uppercase tracking-[0.15em]">
                                                             {format(new Date(session.scheduled_at), "MMM do, h:mm a")}
                                                         </span>
                                                     </div>
-                                                    <h3 className="text-lg font-bold text-white uppercase group-hover:text-indigo-400 transition-colors">
+                                                    <h3 className="text-lg font-bold text-white uppercase group-hover:text-emerald-400 transition-colors">
                                                         {session.applications?.name}
                                                     </h3>
                                                     <p className="text-[10px] text-slate-500 font-bold uppercase">{session.applications?.jobs?.title}</p>
                                                 </div>
                                                 <Link href={`/room/${session.id}`}>
-                                                    <Button className="bg-white/5 hover:bg-indigo-600 text-white rounded-xl py-5 px-5 flex items-center gap-2 group-hover:shadow-lg group-hover:shadow-indigo-600/20 transition-all">
+                                                    <Button className="bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/20 rounded-xl py-5 px-5 flex items-center gap-2 transition-all">
                                                         <Video className="w-4 h-4" />
-                                                        <span className="text-[10px] font-black uppercase tracking-widest">JOIN</span>
+                                                        <span className="text-[10px] font-black uppercase tracking-widest">JOIN MEET</span>
                                                     </Button>
                                                 </Link>
                                             </div>
@@ -146,7 +146,7 @@ export function RecruiterDashboardClient({
                             </div>
                         </div>
 
-                        {/* UPLOADED JOBS */}
+                        {/* 2. UPLOADED JOBS */}
                         <div>
                             <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-wider flex items-center gap-3">
                                 <Briefcase className="w-6 h-6 text-indigo-400" />

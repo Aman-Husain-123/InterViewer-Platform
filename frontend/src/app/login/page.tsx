@@ -17,8 +17,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,23 +33,21 @@ export default function LoginPage() {
       setError(authError.message);
       setLoading(false);
       return;
-    }
-
-    // Fetch role from separate pools
+    }    // Fetch role from profiles table
     const userId = data.user?.id;
     if (userId) {
-      // Check if recruiter
-      const { data: recProfile } = await supabase
-        .from("recruiters")
-        .select("id")
+      // Check profiles table for role
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
         .eq("id", userId)
-        .single();
+        .single() as { data: { role?: string } | null };
 
-      const role = recProfile ? "recruiter" : "candidate";
+      const userRole = (profile?.role as string) || "candidate";
       
       const destination =
         redirectTo ||
-        (role === "recruiter" ? "/recruiter/dashboard" : "/candidate/dashboard");
+        (userRole === "recruiter" ? "/recruiter/dashboard" : "/candidate/dashboard");
       
       router.push(destination);
       router.refresh();
