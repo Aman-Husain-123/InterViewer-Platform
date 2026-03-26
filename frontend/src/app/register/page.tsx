@@ -60,7 +60,7 @@ export default function RegisterPage() {
                 id: data.user.id,
                 email,
                 full_name: fullName,
-            }, { on_conflict: 'id' }).execute();
+            }, { on_conflict: 'id' });
         }
 
         setSuccess(true);

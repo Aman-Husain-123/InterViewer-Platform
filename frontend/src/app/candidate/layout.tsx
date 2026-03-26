@@ -52,7 +52,7 @@ export default function CandidateLayout({
           id: userId,
           email: session.user.email,
           full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || "Candidate"
-      }, { on_conflict: 'id' }).execute();
+      }, { on_conflict: 'id' });
 
       setLoading(false);
 
