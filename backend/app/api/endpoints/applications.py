@@ -116,7 +116,7 @@ async def get_my_invites(user: CurrentUser = Depends(get_current_user)):
     res = (
         supabase.table("applications")
         .select("id, status, match_score, job_id, jobs(title, department)")
-        .eq("email", user.email)
+        .ilike("email", user.email)
         .in_("status", ["invited", "interview_scheduled"])
         .execute()
     )
@@ -131,11 +131,11 @@ async def get_my_interviews(user: CurrentUser = Depends(get_current_user)):
     if not user.email:
         return []
 
-    # 1. Find all application IDs for this email
+    # 1. Find all application IDs for this email (CASE-INSENSITIVE)
     app_res = (
         supabase.table("applications")
         .select("id")
-        .eq("email", user.email)
+        .ilike("email", user.email)
         .execute()
     )
     if not app_res.data:
@@ -165,7 +165,7 @@ async def get_my_history(user: CurrentUser = Depends(get_current_user)):
     res = (
         supabase.table("applications")
         .select("*, jobs(title, department, location)")
-        .eq("email", user.email)
+        .ilike("email", user.email)
         .order("created_at", desc=True)
         .execute()
     )
