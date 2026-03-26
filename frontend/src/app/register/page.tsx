@@ -53,14 +53,14 @@ export default function RegisterPage() {
             return;
         }
 
-        // 2. Upsert profile row
+        // 2. Sync to separate tables based on role
         if (data.user) {
-            await supabase.from("profiles").upsert({
+            const table = role === "recruiter" ? "recruiters" : "candidates";
+            await supabase.from(table).upsert({
                 id: data.user.id,
                 email,
                 full_name: fullName,
-                role,
-            });
+            }, { on_conflict: 'id' }).execute();
         }
 
         setSuccess(true);
