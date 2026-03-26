@@ -89,7 +89,7 @@ export default function RegisterPage() {
                         Check your email to confirm your account, then sign in.
                     </p>
                     <Link
-                        href="/login"
+                        href={role === 'recruiter' ? "/login" : "/candidate/login"}
                         className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 px-6 text-sm transition-all shadow-lg shadow-indigo-600/30"
                     >
                         Go to Login

@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { LogOut, Plus, Users, LayoutDashboard, Briefcase, ChevronRight, Settings } from "lucide-react";
 import type { Database } from "@/types/database";
 import Link from "next/link";
+import { format } from "date-fns";
+import { Video } from "lucide-react";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type Job = Database["public"]["Tables"]["jobs"]["Row"] & {
@@ -13,7 +15,8 @@ type Job = Database["public"]["Tables"]["jobs"]["Row"] & {
 
 interface RecruiterDashboardClientProps {
     profile: Profile | null;
-    jobs: Job[];
+    jobs: any[];
+    upcomingSessions: any[];
     interviewsCompleted: number;
     userEmail: string;
 }
@@ -21,6 +24,7 @@ interface RecruiterDashboardClientProps {
 export function RecruiterDashboardClient({
     profile,
     jobs,
+    upcomingSessions,
     interviewsCompleted,
     userEmail,
 }: RecruiterDashboardClientProps) {
@@ -101,44 +105,80 @@ export function RecruiterDashboardClient({
                         ))}
                     </div>
 
-                    <h2 className="text-xl font-bold text-white mb-6 tracking-wide flex items-center gap-3">
-                        <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                        ACTIVE LISTINGS
-                    </h2>
-
-                    <div className="grid gap-4">
-                        {jobs.length === 0 ? (
-                            <div className="bg-white/5 border border-dashed border-white/10 rounded-3xl p-16 text-center">
-                                <p className="text-slate-500 font-medium">No job listings yet. Start by creating your first hiring campaign.</p>
-                            </div>
-                        ) : (
-                            jobs.map((job) => (
-                                <div key={job.id} className="group bg-slate-900/40 border border-white/5 hover:border-indigo-500/40 rounded-3xl p-6 transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-500/5">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-6">
-                                            <div className="hidden sm:flex w-14 h-14 rounded-2xl bg-slate-800 items-center justify-center group-hover:bg-indigo-600 transition-all duration-500 group-hover:rotate-12">
-                                                <Briefcase className="w-7 h-7 text-slate-500 group-hover:text-white transition-all" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-xl font-bold text-white group-hover:text-indigo-400 transition-all leading-tight">
-                                                    {job.title}
-                                                </h3>
-                                                <div className="flex items-center gap-3 mt-1.5">
-                                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{job.location || "REMOTE"}</span>
-                                                    <div className="w-1 h-1 rounded-full bg-slate-800"></div>
-                                                    <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest">{job.applicantCount} APPLICANTS</span>
+                    <div className="grid lg:grid-cols-2 gap-12 mb-12">
+                        <div>
+                            <h2 className="text-xl font-bold text-white mb-6 tracking-wide flex items-center gap-3">
+                                <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                                UPCOMING INTERVIEWS ({upcomingSessions.length})
+                            </h2>
+                            <div className="space-y-4">
+                                {upcomingSessions.length === 0 ? (
+                                    <div className="bg-slate-900/40 border border-white/5 rounded-[32px] p-10 text-center">
+                                        <p className="text-slate-500 text-sm italic">No confirmed bookings yet.</p>
+                                    </div>
+                                ) : (
+                                    upcomingSessions.map((session) => (
+                                        <div key={session.id} className="bg-slate-900/40 border border-white/5 p-6 rounded-[32px] hover:bg-slate-900/60 transition-all border-l-4 border-l-indigo-600 group">
+                                            <div className="flex items-center justify-between">
+                                                <div className="space-y-1">
+                                                    <div className="flex items-center gap-2 text-indigo-400">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                                                        <span className="text-[10px] font-black uppercase tracking-[0.15em]">
+                                                            {format(new Date(session.scheduled_at), "MMM do, h:mm a")}
+                                                        </span>
+                                                    </div>
+                                                    <h3 className="text-lg font-bold text-white uppercase group-hover:text-indigo-400 transition-colors">
+                                                        {session.applications?.name}
+                                                    </h3>
+                                                    <p className="text-[10px] text-slate-500 font-bold uppercase">{session.applications?.jobs?.title}</p>
                                                 </div>
+                                                <Link href={`/room/${session.id}`}>
+                                                    <Button className="bg-white/5 hover:bg-indigo-600 text-white rounded-xl py-5 px-5 flex items-center gap-2 group-hover:shadow-lg group-hover:shadow-indigo-600/20 transition-all">
+                                                        <Video className="w-4 h-4" />
+                                                        <span className="text-[10px] font-black uppercase tracking-widest">JOIN</span>
+                                                    </Button>
+                                                </Link>
                                             </div>
                                         </div>
-                                        <Link href={`/recruiter/jobs/${job.id}/candidates`}>
-                                            <Button variant="ghost" className="h-14 w-14 rounded-2xl bg-white/5 text-slate-400 hover:bg-indigo-600 hover:text-white transition-all">
-                                                <ChevronRight className="w-6 h-6" />
-                                            </Button>
-                                        </Link>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        <div>
+                            <h2 className="text-xl font-bold text-white mb-6 tracking-wide flex items-center gap-3">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                ACTIVE LISTINGS ({jobs.length})
+                            </h2>
+                            <div className="grid gap-4">
+                                {jobs.length === 0 ? (
+                                    <div className="bg-white/5 border border-dashed border-white/10 rounded-[32px] p-10 text-center">
+                                        <p className="text-slate-500 font-medium italic text-sm">No job listings yet.</p>
                                     </div>
-                                </div>
-                            ))
-                        )}
+                                ) : (
+                                    jobs.map((job) => (
+                                        <div key={job.id} className="group bg-slate-900/40 border border-white/5 hover:border-indigo-500/40 rounded-3xl p-6 transition-all duration-300">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center group-hover:bg-indigo-600 transition-all">
+                                                        <Briefcase className="w-5 h-5 text-slate-500 group-hover:text-white" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-md font-bold text-white group-hover:text-indigo-400 transition-all">{job.title}</h3>
+                                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{job.applicantCount} Applicants</p>
+                                                    </div>
+                                                </div>
+                                                <Link href={`/recruiter/jobs/${job.id}/candidates`}>
+                                                    <Button variant="ghost" className="h-10 w-10 rounded-xl bg-white/5 text-slate-400 hover:bg-indigo-600 hover:text-white transition-all">
+                                                        <ChevronRight className="w-4 h-4" />
+                                                    </Button>
+                                                </Link>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </main>

@@ -51,6 +51,18 @@ export default function CandidateDashboard() {
 
       setUserName(session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || "Candidate");
 
+      // 1. SYNC PROFILE (Ensures profile exists even after a DB wipe)
+      try {
+        await supabase.from("profiles").upsert({
+            id: session.user.id,
+            email: session.user.email,
+            role: 'candidate',
+            full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || "Candidate"
+        }, { on_conflict: 'id' }).execute();
+      } catch (e) {
+        console.error("Profile auto-sync failed:", e);
+      }
+
       const headers = { "Authorization": `Bearer ${session.access_token}` };
       const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 

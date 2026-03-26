@@ -38,10 +38,22 @@ export default function CandidateLayout({
         .eq("id", userId)
         .single();
 
-      if (profile?.role !== "candidate") {
-        // If they are a recruiter, we don't just push them; we explain the portal is separate.
-        // Or we just push to Recruiter Dashboard if they were ALREADY there.
-        // But for better UX during testing, lets just sign them out so they can log in as candidate.
+      // IF PROFILE IS MISSING (After a DB wipe): 
+      // Auto-restore it as 'candidate' so they aren't locked out of their own dashboard.
+      if (!profile) {
+          console.log("Profile missing, auto-restoring as candidate...");
+          await supabase.from("profiles").upsert({
+              id: userId,
+              email: session.user.email,
+              role: 'candidate',
+              full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || "Candidate"
+          }, { on_conflict: 'id' }).execute();
+          setLoading(false);
+          return;
+      }
+
+      if (profile.role !== "candidate") {
+        // Only block if they are explicitly marked as a recruiter
         await supabase.auth.signOut();
         router.push("/candidate/login?error=recruiter_mismatch");
         return;

@@ -12,7 +12,8 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") || "";
 
-  const [activeTab, setActiveTab] = useState<"recruiter" | "candidate">("candidate");
+  const roleParam = searchParams.get("role") as "recruiter" | "candidate" | null;
+  const [activeTab, setActiveTab] = useState<"recruiter" | "candidate">(roleParam === "recruiter" ? "recruiter" : "candidate");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);

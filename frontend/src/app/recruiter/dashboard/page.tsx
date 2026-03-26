@@ -10,7 +10,7 @@ export default async function RecruiterDashboardPage() {
 
     if (!user) redirect("/login");
 
-    // Parallel fetch: profile + jobs + application details (status included)
+    // 1. Fetch profile and jobs
     const [{ data: profile }, { data: jobs }] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", user.id).single(),
         supabase
@@ -19,6 +19,30 @@ export default async function RecruiterDashboardPage() {
             .eq("recruiter_id", user.id)
             .order("created_at", { ascending: false }),
     ]);
+
+    const jobIds = (jobs || []).map(j => j.id);
+    
+    // 2. Fetch upcoming interview sessions for recruiter's jobs
+    const { data: rawSessions } = await supabase
+        .from("interview_sessions")
+        .select(`
+            id,
+            scheduled_at,
+            applications!inner (
+                id,
+                name,
+                job_id,
+                jobs!inner (
+                    id,
+                    title,
+                    recruiter_id
+                )
+            )
+        `)
+        .eq("applications.jobs.recruiter_id", user.id)
+        .gte("scheduled_at", new Date().toISOString())
+        .order("scheduled_at", { ascending: true })
+        .limit(5);
 
     // Transform data to include application counts
     const jobsWithCount = (jobs || []).map(job => ({
@@ -37,6 +61,7 @@ export default async function RecruiterDashboardPage() {
         <RecruiterDashboardClient
             profile={profile}
             jobs={jobsWithCount}
+            upcomingSessions={rawSessions || []}
             interviewsCompleted={interviewsCompleted}
             userEmail={user.email ?? ""}
         />
