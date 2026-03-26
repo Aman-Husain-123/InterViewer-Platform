@@ -295,9 +295,10 @@ export default function CandidateDashboard() {
                                         </div>
                                         <Button 
                                             onClick={() => router.push(`/schedule/${invite.id}`)}
-                                            className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl h-14 w-14 p-0 shadow-lg shadow-indigo-600/30"
+                                            className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-3 px-6 shadow-lg shadow-indigo-600/30 flex items-center gap-2 font-black uppercase tracking-widest text-xs"
                                         >
-                                            <ChevronRight className="w-6 h-6" />
+                                            <Calendar className="w-4 h-4" />
+                                            Schedule Meet
                                         </Button>
                                     </div>
                                 </Card>

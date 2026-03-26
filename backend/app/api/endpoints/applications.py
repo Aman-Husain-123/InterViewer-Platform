@@ -117,7 +117,7 @@ async def get_my_invites(user: CurrentUser = Depends(get_current_user)):
         supabase.table("applications")
         .select("id, status, match_score, job_id, jobs(title, department)")
         .ilike("email", user.email)
-        .in_("status", ["invited", "interview_scheduled"])
+        .eq("status", "invited")
         .execute()
     )
     return res.data or []

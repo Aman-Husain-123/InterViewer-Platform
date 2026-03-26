@@ -106,8 +106,9 @@ export function RecruiterDashboardClient({
                     </div>
 
                     <div className="grid lg:grid-cols-2 gap-12 mb-12">
+                        {/* UPCOMING SESSIONS */}
                         <div>
-                            <h2 className="text-xl font-bold text-white mb-6 tracking-wide flex items-center gap-3">
+                            <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-wider flex items-center gap-3">
                                 <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
                                 UPCOMING INTERVIEWS ({upcomingSessions.length})
                             </h2>
@@ -145,37 +146,32 @@ export function RecruiterDashboardClient({
                             </div>
                         </div>
 
+                        {/* UPLOADED JOBS */}
                         <div>
-                            <h2 className="text-xl font-bold text-white mb-6 tracking-wide flex items-center gap-3">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                ACTIVE LISTINGS ({jobs.length})
+                            <h2 className="text-xl font-bold text-white mb-6 uppercase tracking-wider flex items-center gap-3">
+                                <Briefcase className="w-6 h-6 text-indigo-400" />
+                                Uploaded Jobs
                             </h2>
-                            <div className="grid gap-4">
-                                {jobs.length === 0 ? (
-                                    <div className="bg-white/5 border border-dashed border-white/10 rounded-[32px] p-10 text-center">
-                                        <p className="text-slate-500 font-medium italic text-sm">No job listings yet.</p>
-                                    </div>
-                                ) : (
-                                    jobs.map((job) => (
-                                        <div key={job.id} className="group bg-slate-900/40 border border-white/5 hover:border-indigo-500/40 rounded-3xl p-6 transition-all duration-300">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center group-hover:bg-indigo-600 transition-all">
-                                                        <Briefcase className="w-5 h-5 text-slate-500 group-hover:text-white" />
-                                                    </div>
-                                                    <div>
-                                                        <h3 className="text-md font-bold text-white group-hover:text-indigo-400 transition-all">{job.title}</h3>
-                                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{job.applicantCount} Applicants</p>
-                                                    </div>
-                                                </div>
-                                                <Link href={`/recruiter/jobs/${job.id}/candidates`}>
-                                                    <Button variant="ghost" className="h-10 w-10 rounded-xl bg-white/5 text-slate-400 hover:bg-indigo-600 hover:text-white transition-all">
-                                                        <ChevronRight className="w-4 h-4" />
-                                                    </Button>
-                                                </Link>
+                            <div className="space-y-4">
+                                {jobs.map(job => (
+                                    <div key={job.id} className="group bg-slate-900/40 border border-white/5 hover:border-indigo-500/30 rounded-[32px] p-6 transition-all">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <h3 className="text-lg font-bold text-white group-hover:text-indigo-400 transition-colors uppercase italic">{job.title}</h3>
+                                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">{job.applicantCount} Applicants</p>
                                             </div>
+                                            <Link href={`/recruiter/jobs/${job.id}/candidates`}>
+                                                <button className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-slate-400 hover:bg-indigo-600 hover:text-white transition-all">
+                                                    <ChevronRight className="w-5 h-5" />
+                                                </button>
+                                            </Link>
                                         </div>
-                                    ))
+                                    </div>
+                                ))}
+                                {jobs.length === 0 && (
+                                    <div className="bg-slate-900/40 border border-white/5 rounded-[32px] p-10 text-center">
+                                        <p className="text-slate-500 text-sm italic">No active listings.</p>
+                                    </div>
                                 )}
                             </div>
                         </div>
