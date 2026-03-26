@@ -81,6 +81,36 @@ CREATE TABLE IF NOT EXISTS public.assessments (
 
 ALTER TABLE public.assessments ENABLE ROW LEVEL SECURITY;
 
+-- 6. Interview Invites Table (NEW)
+-- Tracks proposed time slots and candidate responses
+CREATE TABLE IF NOT EXISTS public.interview_invites (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  recruiter_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  application_id UUID REFERENCES public.applications(id) ON DELETE CASCADE NOT NULL,
+  proposed_time_slots TIMESTAMPTZ[] DEFAULT '{}',
+  selected_time_slot TIMESTAMPTZ,
+  status TEXT CHECK (status IN ('pending', 'accepted', 'rejected', 'cancelled')) DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.interview_invites ENABLE ROW LEVEL SECURITY;
+
+-- 7. Notifications Table (NEW)
+-- Stores in-app notifications for candidates and recruiters
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  type TEXT CHECK (type IN ('INTERVIEW_INVITE', 'RESPONSE', 'REMINDER', 'ACCEPTED', 'SCHEDULED')) DEFAULT 'INTERVIEW_INVITE',
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  metadata JSONB DEFAULT '{}',
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
 -- RLS POLICIES --
 
 -- Profiles: Users can view their own profile, recruiters can view candidates
@@ -98,6 +128,17 @@ CREATE POLICY "Recruiters view job apps" ON public.applications FOR SELECT USING
 );
 CREATE POLICY "Public apply" ON public.applications FOR INSERT WITH CHECK (TRUE);
 
+-- Interview Invites: Recruiters manage their own, candidates view invites for their applications
+CREATE POLICY "Recruiters manage invites" ON public.interview_invites FOR ALL USING (auth.uid() = recruiter_id);
+CREATE POLICY "Candidates view invites" ON public.interview_invites FOR SELECT USING (
+  EXISTS (SELECT 1 FROM public.applications WHERE applications.id = interview_invites.application_id AND applications.email = (SELECT email FROM public.profiles WHERE id = auth.uid()))
+);
+
+-- Notifications: Users can view their own notifications
+CREATE POLICY "Users view own notifications" ON public.notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users mark own notifications read" ON public.notifications FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "System creates notifications" ON public.notifications FOR INSERT WITH CHECK (TRUE);
+
 -- Trigger for updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -110,3 +151,4 @@ $$ language 'plpgsql';
 CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_jobs_updated_at BEFORE UPDATE ON public.jobs FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_applications_updated_at BEFORE UPDATE ON public.applications FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+CREATE TRIGGER update_interview_invites_updated_at BEFORE UPDATE ON public.interview_invites FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();

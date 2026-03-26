@@ -9,7 +9,10 @@ from app.core.config import settings
 
 class ResumeParserService:
     def __init__(self):
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.client = OpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            base_url=settings.OPENAI_BASE_URL
+        )
 
     def extract_text(self, file_content: bytes, filename: str) -> str:
         """Extracts raw text from PDF or DOCX bytes."""

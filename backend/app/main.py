@@ -8,8 +8,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.api.endpoints import jobs, applications, assessments, schedule, interview_ws
-from app.api.v1.endpoints import auth
+from app.api.endpoints import jobs, applications, assessments, schedule, notifications
+from app.api.v1.endpoints import auth, interview_ws
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -34,6 +34,7 @@ app.include_router(jobs.router,          prefix="/api/v1/jobs",         tags=["J
 app.include_router(applications.router,  prefix="/api/v1/applications",  tags=["Applications"])
 app.include_router(assessments.router,   prefix="/api/v1/assessments",   tags=["Assessments"])
 app.include_router(schedule.router,      prefix="/api/v1/schedule",      tags=["Schedule"])
+app.include_router(notifications.router, prefix="/api/v1",               tags=["Notifications & Invites"])
 app.include_router(interview_ws.router,  prefix="/ws/v1/interview",      tags=["Interview WS"])
 
 # New v1 auth router

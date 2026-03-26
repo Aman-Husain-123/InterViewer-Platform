@@ -38,7 +38,7 @@ export default async function RecruiterDashboardPage() {
     
     // 2. Fetch upcoming interview sessions for recruiter's jobs
     const { data: rawSessions } = await supabase
-        .from("interview_sessions")
+        .from("interviews")
         .select(`
             id,
             scheduled_at,

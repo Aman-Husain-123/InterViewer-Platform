@@ -1,6 +1,6 @@
 """
 Schedule endpoints:
-  GET  /api/v1/schedule/slots?application_id=xxx  → next 7 days × 6 time slots
+  GET  /api/v1/schedule/slots?application_id=xxx   → next 7 days × 6 time slots
   POST /api/v1/schedule/book                       → book a slot, send confirmation
   POST /api/v1/schedule/invite                     → send invite email to candidate
 
@@ -10,6 +10,7 @@ Design notes:
   - unique_link and reminder_sent are stored in the interviews row at insert
     so reminders.py can filter by reminder_sent=False.
   - Slot check uses a small ±1-minute window to handle minor ISO string drift.
+  - Logging added for debugging scheduling workflow
 """
 
 from fastapi import APIRouter, HTTPException
@@ -17,12 +18,14 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 import uuid
 import pytz
+import logging
 from app.db.supabase import supabase
 from app.services.email_service import send_confirmation_email, send_invite_email
 from app.core.config import settings
 from pydantic import BaseModel
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # ── Pydantic models ───────────────────────────────────────────────────────────
@@ -145,6 +148,8 @@ async def book_interview(booking: BookingCreate):
       5. Sends confirmation email with .ics attachment.
     Returns: {interview_id, unique_link, scheduled_at}
     """
+    logger.info(f"🔄 Booking interview for application {booking.application_id} at {booking.scheduled_at}")
+    
     # Normalise to UTC, strip sub-minute precision for comparison
     scheduled_utc = booking.scheduled_at.astimezone(pytz.UTC).replace(
         second=0, microsecond=0
@@ -163,12 +168,14 @@ async def book_interview(booking: BookingCreate):
         .execute()
     )
     if check_res.data:
+        logger.warning(f"⚠️ Slot already taken for {booking.scheduled_at}")
         raise HTTPException(
             status_code=409, detail="Slot already taken. Please choose another one."
         )
 
     # 2. Fetch applicant details
     applicant = _fetch_applicant(booking.application_id)
+    logger.info(f"✅ Fetched applicant: {applicant['email']}")
 
     # 3. Create interview row
     interview_id = str(uuid.uuid4())
@@ -184,12 +191,16 @@ async def book_interview(booking: BookingCreate):
     }).execute()
 
     if not insert_res.data:
+        logger.error(f"❌ Failed to create interview record for {booking.application_id}")
         raise HTTPException(status_code=500, detail="Failed to create interview record")
+    
+    logger.info(f"✅ Created interview {interview_id} scheduled for {scheduled_utc.isoformat()}")
 
-    # 6. Update application status
+    # 4. Update application status
     supabase.table("applications").update({
         "status": "interview_scheduled",
     }).eq("id", booking.application_id).execute()
+    logger.info(f"✅ Updated application {booking.application_id} status to interview_scheduled")
 
     # 5. Send confirmation email (non-blocking; errors logged, not raised)
     try:
@@ -200,8 +211,9 @@ async def book_interview(booking: BookingCreate):
             interview_link=unique_link,
             job_title=applicant["job_title"],
         )
+        logger.info(f"✅ Sent confirmation email to {applicant['email']}")
     except Exception as exc:
-        print(f"[WARN] Confirmation email failed: {exc}")
+        logger.warning(f"⚠️ Confirmation email failed: {exc}")
 
     return {
         "interview_id": interview_id,
@@ -217,12 +229,16 @@ async def invite_candidate(payload: InviteRequest):
     """
     Sends a scheduling invitation email and marks application as 'invited'.
     """
+    logger.info(f"📧 Sending invite for application {payload.application_id}")
+    
     applicant = _fetch_applicant(payload.application_id)
+    logger.info(f"✅ Fetched applicant: {applicant['email']} for {applicant['job_title']}")
 
     # Update status
     supabase.table("applications").update({"status": "invited"}).eq(
         "id", payload.application_id
     ).execute()
+    logger.info(f"✅ Updated application {payload.application_id} status to invited")
 
     # Send invitation email
     schedule_link = f"{settings.FRONTEND_URL}/schedule/{payload.application_id}"
@@ -233,7 +249,8 @@ async def invite_candidate(payload: InviteRequest):
             job_title=applicant["job_title"],
             schedule_link=schedule_link,
         )
+        logger.info(f"✅ Sent invite email to {applicant['email']}")
     except Exception as exc:
-        print(f"[WARN] Invite email failed: {exc}")
+        logger.warning(f"⚠️ Invite email failed: {exc}")
 
     return {"message": "Candidate invited successfully", "schedule_link": schedule_link}

@@ -27,8 +27,9 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str = "your-service-role-key-here"
     SUPABASE_JWT_SECRET: str = "your-jwt-secret-here"
 
-    # OpenAI
+    # OpenAI / EURI
     OPENAI_API_KEY: str = ""
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
 
     # AWS SES
     AWS_ACCESS_KEY_ID: str = ""

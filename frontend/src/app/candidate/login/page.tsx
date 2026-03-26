@@ -37,21 +37,35 @@ export default function CandidateLoginPage() {
     // Role check: Only candidates allowed
     const userId = data.user?.id;
     if (userId) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", userId)
-        .single();
+      try {
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", userId)
+          .single() as { data: { role?: string } | null; error: any };
 
-      if (profile?.role === "recruiter") {
-        setError("This portal is for candidates only. Recruiters should log in via the Recruiter Portal.");
-        await supabase.auth.signOut();
+        // If profile doesn't exist yet, create it as a candidate
+        if (profileError || !profile) {
+          console.log("Profile not found, creating as candidate...");
+          await supabase.from("profiles").upsert({
+            id: userId,
+            email: data.user.email || email,
+            role: "candidate",
+          } as any);
+        } else if (profile.role === "recruiter") {
+          setError("This portal is for candidates only. Recruiters should log in via the Recruiter Portal.");
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
+        }
+        
+        router.push(redirectTo);
+        router.refresh();
+      } catch (err) {
+        console.error("Error checking profile:", err);
+        setError("Failed to verify account type. Please try again.");
         setLoading(false);
-        return;
       }
-      
-      router.push(redirectTo);
-      router.refresh();
     }
     setLoading(false);
   }

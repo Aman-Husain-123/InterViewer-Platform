@@ -6,7 +6,10 @@ from app.core.config import settings
 
 class MatchingEngine:
     def __init__(self):
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.client = OpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            base_url=settings.OPENAI_BASE_URL
+        )
         self.embedding_model = "text-embedding-3-small"
 
     def generate_embedding(self, text: str) -> List[float]:

@@ -27,30 +27,51 @@ export default function LoginPage() {
     const { data, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
-    });
-
-    if (authError) {
+    });    if (authError) {
       setError(authError.message);
       setLoading(false);
       return;
     }    // Fetch role from profiles table
     const userId = data.user?.id;
     if (userId) {
-      // Check profiles table for role
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", userId)
-        .single() as { data: { role?: string } | null };
+      try {
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", userId)
+          .single() as { data: { role?: string } | null; error: any };
 
-      const userRole = (profile?.role as string) || "candidate";
-      
-      const destination =
-        redirectTo ||
-        (userRole === "recruiter" ? "/recruiter/dashboard" : "/candidate/dashboard");
-      
-      router.push(destination);
-      router.refresh();
+        // Determine user role, default to candidate if no profile exists
+        let userRole = "candidate";
+        
+        if (profileError) {
+          console.log("Profile not found for user, assuming candidate");
+          // Try to create a profile as candidate if it doesn't exist
+          try {
+            await supabase.from("profiles").insert({
+              id: userId,
+              email: data.user.email || email,
+              role: "candidate",
+            } as any);
+          } catch (insertErr) {
+            console.log("Profile already exists or insert failed");
+          }
+        } else if (profile?.role) {
+          userRole = profile.role;
+        }
+        
+        const destination =
+          redirectTo ||
+          (userRole === "recruiter" ? "/recruiter/dashboard" : "/candidate/dashboard");
+        
+        console.log(`Login successful. User role: ${userRole}, redirecting to: ${destination}`);
+        router.push(destination);
+        router.refresh();
+      } catch (err) {
+        console.error("Error during login role check:", err);
+        setError("An error occurred during login. Please try again.");
+        setLoading(false);
+      }
     }
     setLoading(false);
   }
