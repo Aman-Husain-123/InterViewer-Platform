@@ -5,6 +5,7 @@ from app.db.supabase import supabase
 from app.api.v1.endpoints.auth import get_current_user
 from app.core.deps import CurrentUser
 import uuid
+import json
 
 router = APIRouter()
 
@@ -59,8 +60,18 @@ def list_jobs():
     """Returns all active jobs."""
     try:
         response = supabase.table("jobs").select("*").eq("is_active", True).execute()
-        return response.data or []
+        data = response.data or []
+        # Support both JSON objects and JSON strings from Supabase
+        for job in data:
+            if isinstance(job.get("requirements"), str):
+                try:
+                    job["requirements"] = json.loads(job["requirements"])
+                except Exception as e:
+                    print(f"Failed to parse requirements string: {job.get('requirements')}. Error: {e}")
+                    job["requirements"] = []
+        return data
     except Exception as e:
+        print(f"List Jobs Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.get("/{job_id}", response_model=JobResponse)
@@ -70,8 +81,15 @@ def get_job(job_id: str):
         response = supabase.table("jobs").select("*").eq("id", job_id).execute()
         if not response.data:
             raise HTTPException(status_code=404, detail="Job not found")
-        return response.data[0]
+        job = response.data[0]
+        if isinstance(job.get("requirements"), str):
+            try:
+                job["requirements"] = json.loads(job["requirements"])
+            except:
+                job["requirements"] = []
+        return job
     except HTTPException:
         raise
     except Exception as e:
+        print(f"Get Job Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")

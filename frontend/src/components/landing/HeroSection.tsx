@@ -30,17 +30,23 @@ export function HeroSection() {
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-          <Link href="/apply">
+          <Link href="/candidate/login">
             <Button className="group bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl px-12 py-8 text-lg shadow-2xl shadow-indigo-600/40 transition-all hover:scale-105 active:scale-95 flex items-center gap-3">
-              APPLY FOR JOB
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              START YOUR CAREER
+              <Sparkles className="w-5 h-5 group-hover:animate-spin transition-transform" />
             </Button>
           </Link>
-          <Link href="/login?role=recruiter">
+          <Link href="/apply">
             <Button variant="outline" className="border-white/10 text-white font-black rounded-2xl px-12 py-8 text-lg hover:bg-white/5 transition-all bg-white/5 backdrop-blur-md">
-              RECRUITER PORTAL
+              BROWSE JOBS
             </Button>
           </Link>
+        </div>
+
+        <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-8 text-sm font-bold uppercase tracking-widest">
+            <Link href="/login?role=recruiter" className="text-slate-500 hover:text-indigo-400 transition-colors flex items-center gap-2">
+                For Employers: Recruiter Portal <ArrowRight className="w-4 h-4" />
+            </Link>
         </div>
 
         <div className="mt-24 grid grid-cols-2 md:grid-cols-4 gap-8">

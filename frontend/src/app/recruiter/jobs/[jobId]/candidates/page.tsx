@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { listApplicationsByJob } from "@/services/api";
 import type { Application } from "@/services/api";
 import { Video, Mail, CheckCircle, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner"; // Assuming toast is available
 
 export default function JobCandidatesPage() {

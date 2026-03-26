@@ -21,6 +21,10 @@ export function Navbar() {
         <div className="flex items-center gap-6">
           {!user ? (
             <>
+              <Link href="/candidate/login" className="text-[10px] font-black text-slate-500 hover:text-indigo-400 transition-all uppercase tracking-[0.2em] hidden md:block">
+                Candidate Entry
+              </Link>
+              <div className="w-px h-4 bg-white/10 hidden md:block mx-2" />
               <Link href="/login" className="text-sm font-bold text-slate-400 hover:text-white transition-colors">
                 SIGN IN
               </Link>

@@ -96,6 +96,74 @@ async def get_application_status(application_id: str):
         raise HTTPException(status_code=404, detail="Application not found")
     return res.data[0]
 
+@router.get("/my-invites", response_model=List[Dict[str, Any]])
+async def get_my_invites(user: CurrentUser = Depends(get_current_user)):
+    """
+    List of active job invitations for the logged-in candidate.
+    Matches by email in the applications table.
+    """
+    if not user.email:
+        return []
+
+    res = (
+        supabase.table("applications")
+        .select("id, status, match_score, job_id, jobs(title, department)")
+        .eq("email", user.email)
+        .in_("status", ["invited", "interview_scheduled"])
+        .execute()
+    )
+    return res.data or []
+
+
+@router.get("/my-interviews", response_model=List[Dict[str, Any]])
+async def get_my_interviews(user: CurrentUser = Depends(get_current_user)):
+    """
+    List of scheduled interviews for the logged-in candidate.
+    """
+    if not user.email:
+        return []
+
+    # 1. Find all application IDs for this email
+    app_res = (
+        supabase.table("applications")
+        .select("id")
+        .eq("email", user.email)
+        .execute()
+    )
+    if not app_res.data:
+        return []
+    
+    app_ids = [r["id"] for r in app_res.data]
+
+    # 2. Find interviews for these applications
+    int_res = (
+        supabase.table("interviews")
+        .select("*, applications(jobs(title))")
+        .in_("application_id", app_ids)
+        .order("scheduled_at")
+        .execute()
+    )
+    return int_res.data or []
+
+
+@router.get("/my-history", response_model=List[Dict[str, Any]])
+async def get_my_history(user: CurrentUser = Depends(get_current_user)):
+    """
+    Shows all past job applications for the logged-in candidate.
+    """
+    if not user.email:
+        return []
+
+    res = (
+        supabase.table("applications")
+        .select("*, jobs(title, department, location)")
+        .eq("email", user.email)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return res.data or []
+
+
 @router.get("/{job_id}", dependencies=[Depends(get_current_user)])
 async def list_applications(job_id: str):
     """List applications for a job (Recruiter view)."""

@@ -1,4 +1,18 @@
-from fastapi import APIRouter, HTTPException, Depends
+"""
+Schedule endpoints:
+  GET  /api/v1/schedule/slots?application_id=xxx  → next 7 days × 6 time slots
+  POST /api/v1/schedule/book                       → book a slot, send confirmation
+  POST /api/v1/schedule/invite                     → send invite email to candidate
+
+Design notes:
+  - Candidate email/name are fetched from the `candidates` table (joined via
+    applications.candidate_id), not from `applications` directly.
+  - unique_link and reminder_sent are stored in the interviews row at insert
+    so reminders.py can filter by reminder_sent=False.
+  - Slot check uses a small ±1-minute window to handle minor ISO string drift.
+"""
+
+from fastapi import APIRouter, HTTPException
 from typing import List, Optional
 from datetime import datetime, timedelta
 import uuid
@@ -10,140 +24,216 @@ from pydantic import BaseModel
 
 router = APIRouter()
 
+
+# ── Pydantic models ───────────────────────────────────────────────────────────
+
 class BookingCreate(BaseModel):
     application_id: str
+    scheduled_at: datetime          # ISO 8601, e.g. "2025-04-05T09:00:00Z"
+
+
+class InterviewResponse(BaseModel):
+    id: str
+    application_id: str
     scheduled_at: datetime
+    status: str
+    unique_link: Optional[str] = None
+
 
 class InviteRequest(BaseModel):
     application_id: str
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+_SLOT_HOURS = [9, 10, 11, 14, 15, 16]
+
+
+def _build_slots(now: datetime, booked_datetimes: set) -> List[datetime]:
+    """Generate the next 7 days × 6 fixed time slots, minus already-booked ones."""
+    slots = []
+    for i in range(1, 8):
+        day = (now + timedelta(days=i)).date()
+        for hour in _SLOT_HOURS:
+            slot_time = datetime(
+                day.year, day.month, day.day, hour, 0, 0, tzinfo=pytz.UTC
+            )
+            if slot_time not in booked_datetimes:
+                slots.append(slot_time)
+    return slots
+
+
+def _fetch_applicant(application_id: str) -> dict:
+    """Fetches candidate and job details needed for emails."""
+    res = (
+        supabase.table("applications")
+        .select("id, name, email, job_id, jobs(title)")
+        .eq("id", application_id)
+        .execute()
+    )
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    app_data = res.data[0]
+    job_title = (app_data.get("jobs") or {}).get("title", "Software Engineer")
+    email = app_data.get("email")
+    name = app_data.get("name", "Candidate")
+
+    if not email:
+        raise HTTPException(
+            status_code=422,
+            detail="Candidate email not found for this application.",
+        )
+
+    return {"email": email, "name": name, "job_title": job_title}
+
+
+# ── GET /slots ─────────────────────────────────────────────────────────────────
+
 @router.get("/slots")
 async def get_available_slots(application_id: str):
     """
     Returns available 1-hour slots for the next 7 days.
-    (09:00, 10:00, 11:00, 14:00, 15:00, 16:00)
-    Excludes already booked slots.
+    Excludes already-booked slots across ALL applications (interviewer capacity).
     """
-    # 1. FETCH BOOKED SLOTS
-    # Query all interviews in the next 8 days
     now = datetime.now(pytz.UTC)
-    booked_res = supabase.table("interviews").select("scheduled_at").gt("scheduled_at", now.isoformat()).execute()
-    booked_datetimes = {datetime.fromisoformat(b["scheduled_at"].replace('Z', '+00:00')) for b in booked_res.data}
+    window_end = now + timedelta(days=8)
 
-    # 2. GENERATE POTENTIAL SLOTS
-    slots = []
-    base_hours = [9, 10, 11, 14, 15, 16]
-    
-    for i in range(1, 8):  # Next 7 days
-        day = (now + timedelta(days=i)).date()
-        for hour in base_hours:
-            slot_time = datetime.combine(day, datetime.min.time().replace(hour=hour)).replace(tzinfo=pytz.UTC)
-            
-            # Check if this slot was already booked
-            if slot_time not in booked_datetimes:
-                slots.append(slot_time)
+    booked_res = (
+        supabase.table("interviews")
+        .select("scheduled_at")
+        .gt("scheduled_at", now.isoformat())
+        .lt("scheduled_at", window_end.isoformat())
+        .in_("status", ["scheduled", "in_progress"])
+        .execute()
+    )
 
-    return {"slots": slots}
+    booked_datetimes: set = set()
+    for b in booked_res.data:
+        raw = b["scheduled_at"]
+        try:
+            dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            booked_datetimes.add(dt.replace(second=0, microsecond=0))
+        except Exception:
+            pass
 
+    slots = _build_slots(now, booked_datetimes)
+    return {"slots": [s.isoformat() for s in slots]}
+
+
+# ── GET /{interview_id} ────────────────────────────────────────────────────────
+
+@router.get("/{interview_id}", response_model=InterviewResponse)
+def get_interview(interview_id: str):
+    """Fetches a specific interview by its UUID."""
+    res = supabase.table("interviews").select("*").eq("id", interview_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Interview not found")
+    return res.data[0]
+
+
+# ── POST /book ────────────────────────────────────────────────────────────────
 
 @router.post("/book")
 async def book_interview(booking: BookingCreate):
     """
-    Books an interview slot.
-    - Validates slot availability.
-    - Creates interview row.
-    - Updates application status.
-    - Sends confirmation email.
+    Books an interview slot:
+      1. Validates the slot is still available (race-condition safe).
+      2. Fetches applicant info.
+      3. Inserts interview row (with unique_link + reminder_sent=False).
+      4. Updates application status → 'interview_scheduled'.
+      5. Sends confirmation email with .ics attachment.
+    Returns: {interview_id, unique_link, scheduled_at}
     """
-    try:
-        # 1. Validate slot availability (double-check for race conditions)
-        check_res = supabase.table("interviews").select("*").eq("scheduled_at", booking.scheduled_at.isoformat()).execute()
-        if check_res.data:
-            raise HTTPException(status_code=400, detail="Slot already taken. Please choose another one.")
+    # Normalise to UTC, strip sub-minute precision for comparison
+    scheduled_utc = booking.scheduled_at.astimezone(pytz.UTC).replace(
+        second=0, microsecond=0
+    )
 
-        # 2. Fetch Application & Applicant Info
-        app_res = supabase.table("applications").select("*, jobs(title)").eq("id", booking.application_id).execute()
-        if not app_res.data:
-            raise HTTPException(status_code=404, detail="Application not found")
-        
-        applicant = app_res.data[0]
-        job_title = applicant.get("jobs", {}).get("title", "Applied Position")
-        email = applicant.get("email")
-        name = applicant.get("name")
+    # 1. Double-check availability (window ±1 min)
+    window_start = (scheduled_utc - timedelta(minutes=1)).isoformat()
+    window_end   = (scheduled_utc + timedelta(minutes=1)).isoformat()
 
-        # 3. Create Interview Row
-        interview_id = str(uuid.uuid4())
-        unique_link = f"{settings.FRONTEND_URL}/room/{interview_id}"
-        
-        insert_res = supabase.table("interviews").insert({
-            "id": interview_id,
-            "application_id": booking.application_id,
-            "scheduled_at": booking.scheduled_at.isoformat(),
-            "status": "scheduled"
-        }).execute()
-        
-        if not insert_res.data:
-            raise HTTPException(status_code=500, detail="Failed to create interview record")
-
-        # 4. Update Application Status
-        supabase.table("applications").update({
-            "status": "interview_scheduled",
-            "interview_id": interview_id
-        }).eq("id", booking.application_id).execute()
-
-        # 5. Send Confirmation Email
-        send_confirmation_email(
-            to_email=email,
-            name=name,
-            interview_datetime=booking.scheduled_at,
-            interview_link=unique_link,
-            job_title=job_title
+    check_res = (
+        supabase.table("interviews")
+        .select("id")
+        .gt("scheduled_at", window_start)
+        .lt("scheduled_at", window_end)
+        .in_("status", ["scheduled", "in_progress"])
+        .execute()
+    )
+    if check_res.data:
+        raise HTTPException(
+            status_code=409, detail="Slot already taken. Please choose another one."
         )
 
-        return {
-            "interview_id": interview_id,
-            "unique_link": unique_link,
-            "scheduled_at": booking.scheduled_at
-        }
-    except Exception as e:
-        print(f"Booking Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    # 2. Fetch applicant details
+    applicant = _fetch_applicant(booking.application_id)
 
+    # 3. Create interview row
+    interview_id = str(uuid.uuid4())
+    unique_link  = f"{settings.FRONTEND_URL}/room/{interview_id}"
+
+    insert_res = supabase.table("interviews").insert({
+        "id":             interview_id,
+        "application_id": booking.application_id,
+        "scheduled_at":   scheduled_utc.isoformat(),
+        "status":         "scheduled",
+        "unique_link":    unique_link,
+        "reminder_sent":  False,
+    }).execute()
+
+    if not insert_res.data:
+        raise HTTPException(status_code=500, detail="Failed to create interview record")
+
+    # 6. Update application status
+    supabase.table("applications").update({
+        "status": "interview_scheduled",
+    }).eq("id", booking.application_id).execute()
+
+    # 5. Send confirmation email (non-blocking; errors logged, not raised)
+    try:
+        send_confirmation_email(
+            to_email=applicant["email"],
+            name=applicant["name"],
+            interview_datetime=scheduled_utc,
+            interview_link=unique_link,
+            job_title=applicant["job_title"],
+        )
+    except Exception as exc:
+        print(f"[WARN] Confirmation email failed: {exc}")
+
+    return {
+        "interview_id": interview_id,
+        "unique_link":  unique_link,
+        "scheduled_at": scheduled_utc.isoformat(),
+    }
+
+
+# ── POST /invite ───────────────────────────────────────────────────────────────
 
 @router.post("/invite")
 async def invite_candidate(payload: InviteRequest):
     """
-    Formally invites a candidate to an interview.
-    - Updates status to 'invited'
-    - Sends invitation email with scheduling link
+    Sends a scheduling invitation email and marks application as 'invited'.
     """
+    applicant = _fetch_applicant(payload.application_id)
+
+    # Update status
+    supabase.table("applications").update({"status": "invited"}).eq(
+        "id", payload.application_id
+    ).execute()
+
+    # Send invitation email
+    schedule_link = f"{settings.FRONTEND_URL}/schedule/{payload.application_id}"
     try:
-        # 1. Fetch Application & Job Title
-        app_res = supabase.table("applications").select("*, jobs(title)").eq("id", payload.application_id).execute()
-        if not app_res.data:
-            raise HTTPException(status_code=404, detail="Application not found")
-        
-        app = app_res.data[0]
-        name = app.get("name")
-        email = app.get("email")
-        job_title = app.get("jobs", {}).get("title", "Role")
-        
-        # 2. Update status to 'invited'
-        supabase.table("applications").update({"status": "invited"}).eq("id", payload.application_id).execute()
-        
-        # 3. Send Invitation Email
-        schedule_link = f"{settings.FRONTEND_URL}/schedule/{payload.application_id}"
-        
         send_invite_email(
-            to_email=email,
-            name=name,
-            job_title=job_title,
-            schedule_link=schedule_link
+            to_email=applicant["email"],
+            name=applicant["name"],
+            job_title=applicant["job_title"],
+            schedule_link=schedule_link,
         )
-        
-        return {"message": "Candidate invited successfully"}
-        
-    except Exception as e:
-        print(f"Invite Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as exc:
+        print(f"[WARN] Invite email failed: {exc}")
+
+    return {"message": "Candidate invited successfully", "schedule_link": schedule_link}

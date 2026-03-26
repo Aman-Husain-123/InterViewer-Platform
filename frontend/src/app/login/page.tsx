@@ -10,8 +10,9 @@ export default function LoginPage() {
   const supabase = getSupabaseBrowserClient();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") ?? "";
+  const redirectTo = searchParams.get("redirectTo") || "";
 
+  const [activeTab, setActiveTab] = useState<"recruiter" | "candidate">("candidate");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -44,9 +45,13 @@ export default function LoginPage() {
         .single();
 
       const role = profile?.role ?? "candidate";
+      
+      // Strict role check: if they logged into the "wrong" tab, warn them or redirect anyway
+      // For now, redirect to the dashboard their profile dictates.
       const destination =
         redirectTo ||
         (role === "recruiter" ? "/recruiter/dashboard" : "/candidate/dashboard");
+      
       router.push(destination);
       router.refresh();
     }
@@ -63,18 +68,34 @@ export default function LoginPage() {
 
       <div className="relative w-full max-w-md">
         {/* Logo mark */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 shadow-lg shadow-indigo-600/40 mb-4">
             <LogIn className="w-6 h-6 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-white">Welcome back</h1>
-          <p className="text-slate-400 mt-1 text-sm">
-            Sign in to your AI Interviewer account
+          <h1 className="text-4xl font-black text-white tracking-tighter">Unified Login</h1>
+          <p className="text-slate-400 mt-2 text-sm font-medium">
+            Choose your portal and sign in
           </p>
         </div>
 
+        {/* Tab Switcher */}
+        <div className="grid grid-cols-2 p-1 bg-slate-800/50 backdrop-blur-md rounded-2xl mb-6 border border-white/5">
+          <button 
+            onClick={() => setActiveTab("candidate")}
+            className={`py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'candidate' ? 'bg-indigo-600 text-white shadow-xl' : 'text-slate-500 hover:text-slate-300'}`}
+          >
+            Candidate
+          </button>
+          <button 
+            onClick={() => setActiveTab("recruiter")}
+            className={`py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'recruiter' ? 'bg-indigo-600 text-white shadow-xl' : 'text-slate-500 hover:text-slate-300'}`}
+          >
+            Recruiter
+          </button>
+        </div>
+
         {/* Card */}
-        <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 shadow-2xl">
+        <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-[32px] p-10 shadow-3xl">
           {error && (
             <div className="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
               {error}

@@ -9,7 +9,7 @@ const API_BASE = typeof window !== "undefined"
 
 const supabase = getSupabaseBrowserClient();
 
-async function getAuthHeaders() {
+async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data: { session } } = await supabase.auth.getSession();
   return session ? { "Authorization": `Bearer ${session.access_token}` } : {};
 }
@@ -75,3 +75,11 @@ export async function listApplicationsByJob(jobId: string): Promise<Application[
 }
 
 // ... Add other exports as needed or keep old ones if they don't need auth
+
+/**
+ * Returns the WebSocket URL for a specific interview.
+ */
+export function getInterviewWebSocketUrl(interviewId: string): string {
+  const wsBase = API_BASE.replace(/^http/, "ws");
+  return `${wsBase}/api/v1/interview/${interviewId}`;
+}

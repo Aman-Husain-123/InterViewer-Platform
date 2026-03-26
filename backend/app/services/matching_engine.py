@@ -1,4 +1,5 @@
 import numpy as np
+import re
 from typing import List, Dict, Any
 from openai import OpenAI
 from app.core.config import settings
@@ -35,22 +36,30 @@ class MatchingEngine:
         return float(dot_product / (norm_a * norm_b))
 
     def compute_skill_overlap(self, resume_skills: List[str], jd_skills: List[str]) -> float:
-        """Calculates simple intersection-based overlap for skills (0.0 to 1.0)."""
+        """Calculates normalized skill matching (0.0 to 1.0) with fuzzy sub-string handling."""
         if not jd_skills:
             return 1.0  # No specific skills required in JD
         
-        r_skills = set(s.lower().strip() for s in resume_skills)
-        j_skills = set(s.lower().strip() for s in jd_skills)
+        # Normalize: lower, strip, remove non-alphanumeric chars for cleaner matching
+        r_skills = [re.sub(r'[^a-zA-Z0-9]', '', s.lower()) for s in resume_skills if s]
+        j_skills = [re.sub(r'[^a-zA-Z0-9]', '', s.lower()) for s in jd_skills if s]
         
-        # Count semantic overlap if exact match fails? (Optional improvement)
-        overlap = len(r_skills.intersection(j_skills))
-        return overlap / len(j_skills)
+        if not j_skills: return 1.0
+        
+        matches = 0
+        for target in j_skills:
+            # Check if any resume skill is a substring of or contains the target skill
+            # e.g., 'react' matches 'reactjs' and vice versa
+            if any((target in rs or rs in target) for rs in r_skills):
+                matches += 1
+        
+        return matches / len(j_skills)
 
     def compute_match_score(self, resume_text: str, jd_text: str, resume_skills: List[str], jd_requirements: List[str]) -> float:
         """
         Returns a weighted match score (0-100) based on:
-        - 70% Semantic Similarity (Embeddings)
-        - 30% Skill Overlap
+        - 80% Semantic Similarity (Embeddings capture overall context)
+        - 20% Skill Overlap (Ensures specific tooling is present)
         """
         # 1. Semantic Similarity
         resume_emb = self.generate_embedding(resume_text)
@@ -60,9 +69,13 @@ class MatchingEngine:
         # 2. Skill Overlap
         skill_overlap = self.compute_skill_overlap(resume_skills, jd_requirements) # 0 to 1
         
-        # 3. Weighted Final Score
-        final_score = (semantic_sim * 0.7) + (skill_overlap * 0.3)
-        return round(final_score * 100, 1)
+        # 3. Weighted Final Score (Boosted Semantic weight for better general matching)
+        final_score = (semantic_sim * 0.8) + (skill_overlap * 0.2)
+        
+        # Scale: Semantic sim is rarely 1.0, so we normalize the result for UX
+        # Typical good match is 0.7-0.9.
+        ux_score = min(round(final_score * 105, 1), 100.0)
+        return ux_score
 
 matching_engine = MatchingEngine()
 # Default threshold for auto-invite
