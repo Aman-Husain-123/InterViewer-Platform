@@ -143,10 +143,15 @@ export default function CandidateDashboard() {
             </button>
             <button 
               onClick={() => setActiveTab("browse")}
-              className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl font-bold transition-all text-sm uppercase tracking-widest ${activeTab === 'browse' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-white/5 hover:text-white'}`}
+              className={`w-full flex items-center justify-between px-5 py-4 rounded-2xl font-bold transition-all text-sm uppercase tracking-widest ${activeTab === 'browse' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-white/5 hover:text-white'}`}
             >
-              <Search className="w-5 h-5" />
-              Browse Jobs
+              <div className="flex items-center gap-3">
+                <Search className="w-5 h-5" />
+                Browse Jobs
+              </div>
+              {availableJobs.some(j => (Date.now() - new Date(j.created_at || Date.now()).getTime()) < 48 * 60 * 60 * 1000) && (
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-lg shadow-emerald-500/50" />
+              )}
             </button>
           </div>
 
@@ -217,6 +222,45 @@ export default function CandidateDashboard() {
                     </div>
                   </div>
               )}
+
+              {/* Added Latest Jobs Section on Overview */}
+              <div className="space-y-6">
+                <h2 className="text-sm font-black text-indigo-400 uppercase tracking-[0.2em] flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Briefcase className="w-4 h-4" />
+                        Latest Opportunities
+                    </div>
+                    <button onClick={() => setActiveTab("browse")} className="text-[10px] hover:text-white transition-colors">VIEW ALL</button>
+                </h2>
+                <div className="grid md:grid-cols-2 gap-4">
+                    {availableJobs.slice(0, 2).map(job => (
+                        <Card key={job.id} className="bg-slate-900/60 border-white/5 p-6 rounded-[32px] hover:border-indigo-500/30 transition-all group">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h3 className="text-lg font-bold text-white uppercase group-hover:text-indigo-400 transition-colors">{job.title}</h3>
+                                        {(Date.now() - new Date(job.created_at || Date.now()).getTime()) < 48 * 60 * 60 * 1000 && (
+                                            <Badge className="bg-emerald-500/20 text-emerald-400 text-[8px] font-black uppercase rounded-full">New</Badge>
+                                        )}
+                                    </div>
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase">{job.department}</p>
+                                </div>
+                                <Button 
+                                    onClick={() => router.push(`/apply?jobId=${job.id}`)}
+                                    className="bg-white/5 hover:bg-indigo-600 text-white rounded-xl py-2 px-3 text-[10px] font-black uppercase"
+                                >
+                                    Apply
+                                </Button>
+                            </div>
+                        </Card>
+                    ))}
+                    {availableJobs.length === 0 && (
+                        <Card className="bg-slate-900/40 border-white/5 p-8 rounded-[32px] text-center col-span-2">
+                             <p className="text-slate-500 text-xs italic">Checking for new roles...</p>
+                        </Card>
+                    )}
+                </div>
+              </div>
             </div>
           )}
 
