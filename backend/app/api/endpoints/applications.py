@@ -23,6 +23,14 @@ async def apply_job(
     parses, matches vs JD, and stores application.
     """
     try:
+        # 0. CHECK FOR EXISTING APPLICATION (UNIQUENESS)
+        existing_app = supabase.table("applications").select("id").eq("job_id", job_id).eq("email", email).execute()
+        if existing_app.data:
+            raise HTTPException(
+                status_code=400, 
+                detail="Our records show you have already submitted an application for this specific position. Please check your dashboard for updates."
+            )
+
         # 1. READ FILE CONTENT
         file_content = await file.read()
         

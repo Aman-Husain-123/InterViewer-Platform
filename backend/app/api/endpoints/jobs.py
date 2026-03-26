@@ -15,6 +15,15 @@ def create_job(job: JobCreate, current_user: CurrentUser = Depends(get_current_u
     Creates a new job listing.
     """
     try:
+        # 0. CHECK FOR EXISTING JOB POSTING (UNIQUENESS for recruiter)
+        # We check title + recruiter_id to prevent duplicate "Python Engineer" posts by the same company/user
+        existing_job = supabase.table("jobs").select("id").eq("title", job.title).eq("recruiter_id", current_user.id).execute()
+        if existing_job.data:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Error: You have already posted an active opening for '{job.title}'. Please manage the existing listing instead of creating a duplicate."
+            )
+
         # 1. ATTEMPT TO SYNC PROFILE (CRITICAL: We now raise the error if it fails)
         try:
             profile_data = {
