@@ -10,9 +10,9 @@ export default async function RecruiterDashboardPage() {
 
     if (!user) redirect("/login");
 
-    // 1. Fetch profile and jobs
+    // 1. Fetch recruiter profile and jobs
     const [{ data: profile }, { data: jobs }] = await Promise.all([
-        supabase.from("profiles").select("*").eq("id", user.id).single(),
+        supabase.from("recruiters").select("*").eq("id", user.id).single(),
         supabase
             .from("jobs")
             .select("*, applications(id, status)")

@@ -24,23 +24,22 @@ def create_job(job: JobCreate, current_user: CurrentUser = Depends(get_current_u
                 detail=f"Error: You have already posted an active opening for '{job.title}'. Please manage the existing listing instead of creating a duplicate."
             )
 
-        # 1. ATTEMPT TO SYNC PROFILE (CRITICAL: We now raise the error if it fails)
+        # 1. ATTEMPT TO SYNC TO SEPARATE RECRUITERS TABLE
         try:
-            profile_data = {
+            recruiter_data = {
                 "id": current_user.id,
                 "email": current_user.email,
-                "role": "recruiter"
+                "full_name": current_user.email.split('@')[0] if not hasattr(current_user, 'full_name') else current_user.full_name
             }
             # This must succeed for the next step to work
-            supabase.table("profiles").upsert(profile_data, on_conflict="id").execute()
-            print(f"Auto-synced profile for {current_user.email}")
+            supabase.table("recruiters").upsert(recruiter_data, on_conflict="id").execute()
+            print(f"Auto-synced recruiter profile for {current_user.email}")
         except Exception as profile_err:
-            print(f"Profile Sync Fatal Error: {profile_err}")
-            # We raise this because if we can't create the profile, the job WILL NOT save.
-            # This error will show us if the 'profiles' table is missing.
+            print(f"Recruiter Sync Fatal Error: {profile_err}")
+            # We raise this because if we can't create the recruiter entry, the job WILL NOT save.
             raise HTTPException(
                 status_code=500, 
-                detail=f"CRITICAL: Failed to initialize recruiter profile. Reason: {str(profile_err)}"
+                detail=f"CRITICAL: Failed to initialize recruiter entry. Reason: {str(profile_err)}"
             )
 
         # 2. Check if user is recruiter

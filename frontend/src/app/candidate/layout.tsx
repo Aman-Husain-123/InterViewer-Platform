@@ -30,34 +30,31 @@ export default function CandidateLayout({
         return;
       }
 
-      // Verify role
+      // Verify role in separate pools
       const userId = session.user.id;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
+      
+      // Check if they exist in the Recruiters table (If so, they shouldn't be here)
+      const { data: recProfile } = await supabase
+        .from("recruiters")
+        .select("id")
         .eq("id", userId)
         .single();
 
-      // IF PROFILE IS MISSING (After a DB wipe): 
-      // Auto-restore it as 'candidate' so they aren't locked out of their own dashboard.
-      if (!profile) {
-          console.log("Profile missing, auto-restoring as candidate...");
-          await supabase.from("profiles").upsert({
-              id: userId,
-              email: session.user.email,
-              role: 'candidate',
-              full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || "Candidate"
-          }, { on_conflict: 'id' }).execute();
-          setLoading(false);
-          return;
-      }
-
-      if (profile.role !== "candidate") {
-        // Only block if they are explicitly marked as a recruiter
+      if (recProfile) {
+        // Explicitly block recruiters from the candidate flow
         await supabase.auth.signOut();
         router.push("/candidate/login?error=recruiter_mismatch");
         return;
       }
+
+      // Ensure Candidate existence in our dedicated table
+      await supabase.from("candidates").upsert({
+          id: userId,
+          email: session.user.email,
+          full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || "Candidate"
+      }, { on_conflict: 'id' }).execute();
+
+      setLoading(false);
 
       setLoading(false);
     }
