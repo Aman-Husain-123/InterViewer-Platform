@@ -36,19 +36,18 @@ export default function LoginPage() {
       return;
     }
 
-    // Fetch role from profiles to redirect correctly
+    // Fetch role from separate pools
     const userId = data.user?.id;
     if (userId) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
+      // Check if recruiter
+      const { data: recProfile } = await supabase
+        .from("recruiters")
+        .select("id")
         .eq("id", userId)
         .single();
 
-      const role = profile?.role ?? "candidate";
+      const role = recProfile ? "recruiter" : "candidate";
       
-      // Strict role check: if they logged into the "wrong" tab, warn them or redirect anyway
-      // For now, redirect to the dashboard their profile dictates.
       const destination =
         redirectTo ||
         (role === "recruiter" ? "/recruiter/dashboard" : "/candidate/dashboard");
